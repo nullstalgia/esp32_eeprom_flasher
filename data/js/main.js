@@ -1,5 +1,5 @@
 var progress_check_interval;
-var host = "http://192.168.86.40";
+var host = "";
 var timeout = 5000;
 var offset = 0;
 var size = 0;
@@ -79,8 +79,11 @@ function progress_check() {
         var decimal = data.fail_byte;
         result = "Verify Fail at D: " + decimal + "  H: " + toHex(decimal);
         // This can be expanded to the other ones easily, but I don't see a reason to.
-      }
-      if (data.progress == 107) {
+      } else if (data.progress == 105) {
+          result = "Upload to SPIFFS Success";
+      } else if (data.progress == 106) {
+          result = "Upload to SPIFFS Fail";
+      } else if (data.progress == 107) {
         if (data.dump_name != 0) {
           result = "Dumped successfully to: " + data.dump_name + ".eeprom";
         } else {
