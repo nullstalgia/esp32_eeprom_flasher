@@ -31,7 +31,7 @@ Ticker ticker;
 #include <Wire.h>
 
 // This was part of a failed experiment to increase the address space
-// Mainly since I thought 256K meant 256kilo*bits* and not *bytes*
+// Mainly since I thought 256K meant 256kilo*bytes* and not *bits*
 // But, I'm keeping it since it looks nice.
 typedef uint16_t AddrSize;
 
