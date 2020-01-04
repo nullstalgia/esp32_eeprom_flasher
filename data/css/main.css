@@ -1,0 +1,15 @@
+ 
+.files_listbox {
+    width: 25em;
+}
+
+.files_listbox option {
+    width: 25em;
+}
+.i2c_listbox {
+    width: 10em;
+}
+
+.i2c_listbox option {
+    width: 10em;
+}
