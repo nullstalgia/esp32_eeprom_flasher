@@ -1,0 +1,61 @@
+<html>
+  <head>
+    <title>Miniboot - ESP32 Loader</title>
+    <meta content="" />
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" type="text/css" href="css/main.css" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+  </head>
+
+  <body onload="load(false)">
+    <progress id="progress" value="23" max="100"> </progress>
+    <p id="action">???</p>
+    <p id="result">Result: ??</p>
+
+    <p id="battery"></p>
+    <p id="battery_status"></p>
+    <p><a href="upload.html">Upload new file</a></p>
+    <p><a href="dump.html">Generic EEPROM Dump</a></p>
+    <p><a href="miniboot.html">Miniboot Dump and Tools</a></p>
+    <div>
+      <p>.eeprom files:</p>
+      <select name="eeprom" id="eeprom" size="5" class="files_listbox">
+        <option>Loading...</option>
+      </select>
+    </div>
+    <button type="button" onclick="eeprom_action('flash')">Flash</button>
+    <button type="button" onclick="eeprom_action('verify')">Verify</button>
+    <button type="button" onclick="getCRC('spiffs')">MB CRC32</button>
+    <button type="button" onclick="delete_file('eeprom')">Delete</button>
+    <a href="" id="eeprom_download">Download</a>
+    <button type="button" onclick="refresh('eeprom')">Refresh</button>
+    <div>
+      <p>Offset:</p>
+      Decimal:
+      <input type="number" name="quantity" value="0" min="0" id="offset" />
+      <p>Hex: <span id="hex_offset">0x0</span></p>
+    </div>
+    <div>
+      <p>I2C Addresses:</p>
+      <select name="i2c" id="i2c" size="5" class="i2c_listbox">
+        <option>Loading...</option>
+      </select>
+    </div>
+    <div>
+      <button type="button" onclick="refresh('i2c')">Refresh</button>
+    </div>
+
+    <div>
+      <p>Unknown files:</p>
+      <select name="unknown" id="unknown" size="5" class="files_listbox">
+        <option>Loading...</option>
+      </select>
+      <div>
+        <button type="button" onclick="delete_file('unknown')">Delete</button>
+        <a href="" id="unknown_download">Download</a>
+        <button type="button" onclick="refresh('unknown')">Refresh</button>
+      </div>
+    </div>
+  </body>
+  <script src="js/main.js"></script>
+</html>
