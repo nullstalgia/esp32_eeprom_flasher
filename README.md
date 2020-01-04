@@ -23,3 +23,6 @@ If you want to upload to an I2C EEPROM:
 3. Select the newly uploaded file and the I2C address of the EEPROM you want to upload to
 4. Press **Flash** and wait for it to finish.
 5. If you want, you can make sure the content is correct with **Verify**
+
+## Notes:
+Most of this was written in a rush to get something working, but then I decided to expand it to make it something I can release/have others look at and work on :)
