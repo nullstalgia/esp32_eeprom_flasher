@@ -57,7 +57,8 @@ typedef enum {
   VERIFYING_EEPROM,
   DUMP_EEPROM_SERIAL,
   DUMP_EEPROM_SPIFFS,
-  TEMP_MINIBOOT_ACTION
+  TEMP_MINIBOOT_ACTION,
+  ARDUINOOTA_UPDATING
 } Progress_action;
 Progress_action current_action = READY;
 
@@ -979,12 +980,18 @@ void setup() {
     // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
     ticker.attach(0.1, tick);
     Serial.println("Start updating " + type);
+    current_action = ARDUINOOTA_UPDATING;
+    progress = 0;
+    updateProgress();
   })
   .onEnd([]() {
     Serial.println("\nEnd");
   })
-  .onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  .onProgress([](unsigned int otaprogress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (otaprogress / (total / 100)));
+    // The +1 is to avoid a divide by 0 error in case the update is stupidly small.
+    progress = (otaprogress / (total / 100) + 1);
+    updateProgress();
   })
   .onError([](ota_error_t error) {
     Serial.printf("Error[%u]: ", error);
