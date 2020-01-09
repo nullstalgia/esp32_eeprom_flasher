@@ -157,7 +157,7 @@ char crc_to_output[9];
 // 1 (faster, but may not always work): Send the request over and over and over until it acknowledges both data and address
 // 2 (slower, but should be more reliable): Have a small (5+ millisecond) delay between actions to give it time to react and respond
 
-// My testing with the AT24C256 EEPROM @ 400kbit/s worked 100% of the time with:
+// My testing with the AT24C256 EEPROM @ 400kbit/s - 3.3V worked 100% of the time with:
 // EEPROM_MAX_ATTEMPTS = 100
 // EEPROM_DELAY_BETWEEN_ACTIONS = 0
 // EEPROM_REQUEST_FROM_DELAY = 0
@@ -189,6 +189,37 @@ void EEPROM_REQUEST_DELAY() {
   return;
 #endif
 }
+
+// EEPROM Pages. These will up your speed like crazy, even with a small 32-byte buffer/page.
+#define USE_EEPROM_PAGES 1
+#define EEPROM_PAGE_SIZE 32
+
+// Some tests I did (not at all scientific, just with a stopwatch and slow human fingers)
+// Tested with:
+// AT24C256 EEPROM @ 400kbit/s - 3.3V
+// EEPROM_MAX_ATTEMPTS = 100
+// EEPROM_DELAY_BETWEEN_ACTIONS = 0
+// EEPROM_REQUEST_FROM_DELAY = 0
+
+/*
+
+  (1 Byte at a time)
+  Bytes: 4038
+  Writing: ~10.19 seconds
+  Reading and verifying against source file: ~6.49 seconds
+
+  (32-byte pages)
+  Bytes: 27492 (26.8kb)
+  Writing: ~5.64 seconds
+  Reading and verifying against source file: ~4.72 seconds
+
+  (64-byte pages)
+  Bytes: 27492 (26.8kb)
+  Writing: ~3.76 seconds
+  Reading and verifying against source file: ~4.58 seconds
+
+*/
+
 
 void updateProgress() {
   /*
@@ -246,7 +277,7 @@ uint16_t two_bytes_to_decimal(byte byte1, byte byte2) {
 
 // Based on/copied from https://github.com/mihaigalos/Drivers/blob/master/Eeprom/src/e2prom.cpp
 struct readByteResponse readByte(byte eeprom_address, AddrSize registerAddress) {
-  int counter = 0;
+  AddrSize counter = 0;
   readByteResponse funcResponse;
 
   byte response = EEPROM_OTHER_ERROR;
@@ -291,8 +322,66 @@ struct readByteResponse readByte(byte eeprom_address, AddrSize registerAddress) 
 }
 
 // Based on/copied from https://github.com/mihaigalos/Drivers/blob/master/Eeprom/src/e2prom.cpp
+struct readByteResponse readPage(byte eeprom_address, AddrSize registerAddress, uint8_t *databuffer, uint8_t datacount) {
+  AddrSize counter = 0;
+  readByteResponse funcResponse;
+
+  byte response = EEPROM_OTHER_ERROR;
+
+  funcResponse.success = true;
+  funcResponse.data = 0xFF;
+
+  if (datacount > EEPROM_PAGE_SIZE) {
+    funcResponse.response = EEPROM_TOOBIG;
+    funcResponse.success = false;
+    return funcResponse;
+  }
+
+  do {
+    if (counter >= EEPROM_MAX_ATTEMPTS) {
+      funcResponse.response = response;
+      funcResponse.success = false;
+      break;
+    }
+    EEPROM_DELAY();
+    Wire.beginTransmission(eeprom_address);
+    // Too much for my chip. Feel free to uncap if you need I guess.
+    //Wire.write(static_cast<uint8_t>(registerAddress >> 24));
+    //Wire.write(static_cast<uint8_t>(registerAddress >> 16));
+    Wire.write(static_cast<uint8_t>(registerAddress >> 8));
+    Wire.write(static_cast<uint8_t>(registerAddress));
+    response = Wire.endTransmission();
+    counter++;
+  } while (response != EEPROM_OK);
+
+  // Ask the I2C device for data
+  EEPROM_DELAY();
+  Wire.requestFrom(eeprom_address, static_cast<uint8_t>(datacount));
+  funcResponse.response = response;
+  for (int i = 0; i < datacount; i++) {
+    if (funcResponse.success == false) {
+      break;
+    }
+    counter = 0;
+    while (!Wire.available()) {
+      if (counter >= EEPROM_MAX_ATTEMPTS) {
+        funcResponse.success = false;
+        break;
+      }
+      EEPROM_REQUEST_DELAY();
+      counter++;
+    }
+    if (Wire.available()) {
+      databuffer[i] = Wire.read();
+      funcResponse.success = true;
+    }
+  }
+  return funcResponse;
+}
+
+// Based on/copied from https://github.com/mihaigalos/Drivers/blob/master/Eeprom/src/e2prom.cpp
 byte writeByte(byte eepromAddress, AddrSize registerAddress, uint8_t data) {
-  int counter = 0;
+  AddrSize counter = 0;
   //int max_attempts = 100;
   byte response;
   do {
@@ -315,6 +404,38 @@ byte writeByte(byte eepromAddress, AddrSize registerAddress, uint8_t data) {
   return response;
 }
 
+// Based on/copied from https://github.com/mihaigalos/Drivers/blob/master/Eeprom/src/e2prom.cpp
+byte writePage(byte eepromAddress, AddrSize registerAddress, uint8_t *databuffer, uint8_t datacount) {
+  AddrSize counter = 0;
+  //int max_attempts = 100;
+  byte response;
+
+  if (datacount > EEPROM_PAGE_SIZE) {
+    response = EEPROM_TOOBIG;
+    return response;
+  }
+
+  do {
+    if (counter >= EEPROM_MAX_ATTEMPTS) {
+      break;
+    }
+    Wire.beginTransmission(eepromAddress);
+    //Wire.write(static_cast<uint8_t>(registerAddress >> 24));
+    //Wire.write(static_cast<uint8_t>(registerAddress >> 16));
+    Wire.write(static_cast<uint8_t>(registerAddress >> 8));
+    Wire.write(static_cast<uint8_t>(registerAddress));
+    EEPROM_DELAY();
+    for (int i = 0; i < datacount; i++) {
+      Wire.write(databuffer[i]);
+      EEPROM_DELAY();
+    }
+    response = Wire.endTransmission();
+    counter++;
+  } while (response != EEPROM_OK);
+
+
+  return response;
+}
 
 // Dump external EEPROM to SPIFFS
 void dumpEEPROMSPIFFS() {
@@ -345,11 +466,12 @@ void dumpEEPROMSPIFFS() {
   }
   Serial.println("Starting EEPROM > SPIFFS dump.");
   if (success) {
+#if USE_EEPROM_PAGES == 0
     for (int i = 0; i < global_size; i++) {
       Serial.print("Reading pos: ");
       Serial.println(position);
       i2c_response = readByte(global_address, position);
-      if (i2c_response.response == 0) {
+      if (i2c_response.response == EEPROM_OK) {
 
         file.write(i2c_response.data);
 
@@ -367,7 +489,36 @@ void dumpEEPROMSPIFFS() {
         break;
       }
     }
+
+#else
+
+    while (counter < global_size) {
+      uint8_t buffer[EEPROM_PAGE_SIZE];
+      i2c_response = readPage(global_address, position, &buffer[0], EEPROM_PAGE_SIZE);
+      Serial.print("Reading pos: ");
+      Serial.println(position);
+      if (i2c_response.response == EEPROM_OK && i2c_response.success) {
+        for (int i = 0; i < EEPROM_PAGE_SIZE; i++) {
+          file.write(buffer[i]);
+          progress = counter / (progress_size / 100);
+          updateProgress();
+          position++;
+          counter++;
+          if (counter >= global_size) {
+            break;
+          }
+        }
+      } else {
+        progress = 108;
+        Serial.println("Fail due to bad response");
+        Serial.println((int)i2c_response.response);
+        success = false;
+        break;
+      }
+    }
+#endif
   }
+  file.close();
   current_action = READY;
   if (success) {
     progress = 107;
@@ -390,7 +541,7 @@ void dumpEEPROMSerial() {
     //Serial.print("Reading pos: ");
     //Serial.println(position);
     i2c_response = readByte(global_address, position);
-    if (i2c_response.response == 0) {
+    if (i2c_response.response == EEPROM_OK) {
       Serial.write(i2c_response.data);
       progress = counter / (progress_size / 100);
       updateProgress();
@@ -416,7 +567,7 @@ void flashEEPROM() {
   Serial.println("Starting SPIFFS > EEPROM flash.");
   Serial.print("File: ");
   Serial.println(global_file);
-  Serial.print("Address (d): ");
+  Serial.print("I2C Address (d): ");
   Serial.println(global_address);
 
   bool success = true;
@@ -444,10 +595,11 @@ void flashEEPROM() {
     Serial.print("Size: ");
     Serial.println(size);
     while (eeprom_to_flash.available()) {
+#if USE_EEPROM_PAGES == 0
       Serial.print("Writing to pos: ");
       Serial.println(position);
       byte response = writeByte(global_address, position, eeprom_to_flash.read());
-      if (response == 0) {
+      if (response == EEPROM_OK) {
         progress = counter / (progress_size / 100);
         updateProgress();
         // Position and counter are seperate due to offsets.
@@ -460,7 +612,30 @@ void flashEEPROM() {
         Serial.println((int)response);
         success = false;
       }
+#else
+      Serial.print("Writing to pos: ");
+      Serial.println(position);
+      uint8_t buffer[EEPROM_PAGE_SIZE];
+      for (int i = 0; i < EEPROM_PAGE_SIZE; i++) {
+        buffer[i] = eeprom_to_flash.read();
+      }
+      byte response = writePage(global_address, position, &buffer[0], EEPROM_PAGE_SIZE);
+      if (response == EEPROM_OK) {
+        progress = counter / (progress_size / 100);
+        updateProgress();
+        // Position and counter are seperate due to offsets.
+        position += EEPROM_PAGE_SIZE;
+        counter += EEPROM_PAGE_SIZE;
+      } else {
+        eeprom_to_flash.close();
+        progress = 102;
+        Serial.println("Fail due to bad response");
+        Serial.println((int)response);
+        success = false;
+      }
+#endif
     }
+
     eeprom_to_flash.close();
     current_action = READY;
     if (success) {
@@ -481,7 +656,7 @@ void verifyEEPROM() {
   Serial.println("Starting a verify!");
   Serial.print("File: ");
   Serial.println(global_file);
-  Serial.print("Address (d): ");
+  Serial.print("I2C Address (d): ");
   Serial.println(global_address);
 
   bool success = true;
@@ -504,13 +679,14 @@ void verifyEEPROM() {
     }
     Serial.print("Size: ");
     Serial.println(size);
+#if USE_EEPROM_PAGES == 0
     while (eeprom_to_test_against.available()) {
       Serial.print("Reading pos: ");
       Serial.println(position);
 
       readByteResponse i2c_response = readByte(global_address, position);
 
-      if (i2c_response.response == 0) {
+      if (i2c_response.response == EEPROM_OK && i2c_response.success) {
         if (i2c_response.data == eeprom_to_test_against.read()) {
           progress = counter / (progress_size / 100);
           updateProgress();
@@ -542,6 +718,54 @@ void verifyEEPROM() {
       }
 
     }
+#else
+    //counter = 0;
+    while (eeprom_to_test_against.available() && success) {
+      Serial.print("Reading pos: ");
+      Serial.println(position);
+
+      uint8_t buffer[EEPROM_PAGE_SIZE];
+
+      readByteResponse i2c_response = readPage(global_address, position, &buffer[0], EEPROM_PAGE_SIZE);
+
+      if (i2c_response.response == EEPROM_OK && i2c_response.success) {
+        for (int i = 0; i < EEPROM_PAGE_SIZE; i++) {
+          if (buffer[i] == eeprom_to_test_against.read()) {
+            progress = counter / (progress_size / 100);
+            updateProgress();
+            position++;
+            counter++;
+          } else {
+            success = false;
+            progress = 104;
+            byte_failed = position;
+
+            Serial.println("Verify failed! Bad I2C data!");
+            Serial.println("Position DEC/HEX: ");
+            Serial.print(position);
+            Serial.print(" / ");
+            Serial.print(position, HEX);
+            Serial.println("");
+            break;
+          }
+          if (!eeprom_to_test_against.available() || counter >= size) {
+            break;
+          }
+        }
+      } else {
+        eeprom_to_test_against.close();
+        success = false;
+        progress = 104;
+        byte_failed = position;
+        Serial.println("Fail due to bad response");
+        Serial.println((int)i2c_response.response);
+        break;
+      }
+
+
+
+    }
+#endif
 
     eeprom_to_test_against.close();
     current_action = READY;
@@ -637,7 +861,7 @@ void refreshJSON(String dir) {
     Serial.println(" - not a directory");
     return;
   }
-  int counter = 0;
+  AddrSize counter = 0;
   File file = root_dir.openNextFile();
   for (int i = 0; i < MAX_FILE_COUNT; i++) {
     if (counter >= MAX_FILE_COUNT) {
@@ -683,7 +907,7 @@ void scan_i2c()
     Wire.beginTransmission(address);
     error = Wire.endTransmission();
 
-    if (error == 0)
+    if (error == EEPROM_OK)
     {
       Serial.print("I2C device found at address 0x");
       if (address < 16) {
@@ -698,7 +922,7 @@ void scan_i2c()
         break;
       }
     }
-    else if (error == 4)
+    else if (error == EEPROM_OTHER_ERROR)
     {
       Serial.print("Unknown error at address 0x");
       if (address < 16) {
@@ -991,6 +1215,9 @@ void setup() {
     Serial.printf("Progress: %u%%\r", (otaprogress / (total / 100)));
     // The +1 is to avoid a divide by 0 error in case the update is stupidly small.
     progress = (otaprogress / (total / 100) + 1);
+    if (progress >= 100) {
+      progress = 109;
+    }
     updateProgress();
   })
   .onError([](ota_error_t error) {
@@ -1000,6 +1227,8 @@ void setup() {
     else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
     else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
     else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    progress = 110;
+    updateProgress();
   });
 
   ArduinoOTA.begin();
@@ -1007,6 +1236,15 @@ void setup() {
   setupSPIFFS();
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
+    //request->send(200, "text/html", page);
+    if (!did_spiffs_fail) {
+      request->send(SPIFFS, "/index.html", String(), false);
+    } else {
+      request->send(200, "text/plain", "SPIFFS Failed to mount. Formatted. Reflash please!");
+    }
+  });
+
+  server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest * request) {
     //request->send(200, "text/html", page);
     if (!did_spiffs_fail) {
       request->send(SPIFFS, "/index.html", String(), false);

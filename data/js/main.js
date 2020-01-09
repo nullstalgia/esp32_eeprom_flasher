@@ -66,6 +66,8 @@ function progress_check() {
       action = "Dumping to SPIFFS!";
     } else if (data.action == 6) {
       action = "Running Miniboot action!";
+    } else if (data.action == 7) {
+        action = "Updating with ArduinoOTA!";
     }
     var result;
     if (data.progress >= 100) {
@@ -96,6 +98,10 @@ function progress_check() {
         } else {
           result = "Dump Fail";
         }
+      } else if (data.progress == 109) {
+          result = "ArduinoOTA finished. Refresh if it doesn't automatically reconnect";
+      } else if (data.progress == 110) {
+          result = "ArduinoOTA failed! Please try again or flash over UART";
       }
     } else {
       result = "";
