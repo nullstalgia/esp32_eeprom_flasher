@@ -191,6 +191,20 @@ void EEPROM_REQUEST_DELAY() {
 }
 
 // EEPROM Pages. These will up your speed like crazy, even with a small 32-byte buffer/page.
+
+// ~~Though so far, I have noticed that there is corruption more often. PLEASE verify after an upload!~~
+
+// Issue has been found with using Pages. If you don't write at an offset that is divisible by the page, errors will pop up
+// An offset of 0 works fine, however.
+// Example 1:
+// Page Size: 32
+// Offset: 31
+// Will error out
+
+// Example 2:
+// Page size: 32
+// Offset: 1792 (32 times 56)
+// Succeeded.
 #define USE_EEPROM_PAGES 1
 #define EEPROM_PAGE_SIZE 32
 
@@ -427,8 +441,8 @@ byte writePage(byte eepromAddress, AddrSize registerAddress, uint8_t *databuffer
     EEPROM_DELAY();
     for (int i = 0; i < datacount; i++) {
       Wire.write(databuffer[i]);
-      EEPROM_DELAY();
     }
+    EEPROM_DELAY();
     response = Wire.endTransmission();
     counter++;
   } while (response != EEPROM_OK);
@@ -602,7 +616,7 @@ void flashEEPROM() {
       if (response == EEPROM_OK) {
         progress = counter / (progress_size / 100);
         updateProgress();
-        // Position and counter are seperate due to offsets.
+        // Position and counter are seperate due to global_offset.
         position++;
         counter++;
       } else {
@@ -623,7 +637,7 @@ void flashEEPROM() {
       if (response == EEPROM_OK) {
         progress = counter / (progress_size / 100);
         updateProgress();
-        // Position and counter are seperate due to offsets.
+        // Position and counter are seperate due to global_offset.
         position += EEPROM_PAGE_SIZE;
         counter += EEPROM_PAGE_SIZE;
       } else {
