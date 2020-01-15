@@ -125,9 +125,11 @@ JsonArray I2C_Array = i2cdoc.to<JsonArray>();
 
 // How many Binary/EEPROM files (each) do you want to be allowed to scan/display?
 #define MAX_FILE_COUNT 15
-
+#define CONSTANT_ADDITIONS 9
 // Capacity for MAX_I2C_COUNT I2C addresses.
-const size_t binary_eeprom_array_size = (MAX_FILE_COUNT*JSON_ARRAY_SIZE(2) + JSON_ARRAY_SIZE(MAX_FILE_COUNT) + JSON_OBJECT_SIZE(1));
+// Not sure why I need these +CONSTANT_ADDITIONS's on the constants for computing the size.. The assistant says this would be enough without it
+// ¯\_(ツ)_/¯
+const size_t binary_eeprom_array_size = ((MAX_FILE_COUNT + CONSTANT_ADDITIONS) * JSON_ARRAY_SIZE(2) + JSON_ARRAY_SIZE(MAX_FILE_COUNT + CONSTANT_ADDITIONS) + JSON_OBJECT_SIZE(1));
 StaticJsonDocument<binary_eeprom_array_size> file_list_doc;
 
 #define FORMAT_SPIFFS_IF_FAILED true
@@ -270,7 +272,7 @@ bool deleteFile(fs::FS & fs, String path) {
   }
 }
 
-void renameFile(fs::FS & fs, String path1,  String path2) {
+bool renameFile(fs::FS & fs, String path1,  String path2) {
   if (fs.exists(path2)) {
     deleteFile(fs, path2);
   }
@@ -280,8 +282,10 @@ void renameFile(fs::FS & fs, String path1,  String path2) {
   Serial.println(path2);
   if (fs.rename(path1, path2)) {
     Serial.println("- file renamed");
+    return true;
   } else {
     Serial.println("- rename failed");
+    return false;
   }
 }
 
@@ -821,14 +825,25 @@ void handleUpload(AsyncWebServerRequest * request, String filename, size_t index
     String lowerName = filename;
     lowerName.toLowerCase();
     if (lowerName.endsWith("bin")) {
-      renameFile(SPIFFS, "/" + filename, "/bin/" + lowerName);
+      if (renameFile(SPIFFS, "/" + filename, "/bin/" + lowerName)) {
+        progress = 105;
+      } else {
+        progress = 106;
+      }
     } else if (lowerName.endsWith("eeprom")) {
-      renameFile(SPIFFS, "/" + filename, "/eeprom/" + lowerName);
+      if (renameFile(SPIFFS, "/" + filename, "/eeprom/" + lowerName)) {
+        progress = 105;
+      } else {
+        progress = 106;
+      }
     } else {
-      renameFile(SPIFFS, "/" + filename, "/unknown/" + lowerName);
+      if (renameFile(SPIFFS, "/" + filename, "/unknown/" + lowerName)) {
+        progress = 105;
+      } else {
+        progress = 106;
+      }
     }
     current_action = READY;
-    progress = 105;
     request->redirect("/");
   }
 }
