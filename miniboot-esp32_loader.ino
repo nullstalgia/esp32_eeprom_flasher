@@ -470,7 +470,7 @@ void dumpEEPROMSPIFFS() {
   File file = SPIFFS.open(filepath, FILE_WRITE);
 
   AddrSize position = global_offset;
-  AddrSize counter = 0;
+  int counter = 0;
 
   // If the size is under 100 bytes and I try to render the progress, the chip thinks
   // I'm dividing by 0 (which would be technically correct).
@@ -552,7 +552,7 @@ void dumpEEPROMSerial() {
   millis_file_name = 0;
   AddrSize position = global_offset;
   bool success = true;
-  AddrSize counter = 0;
+  int counter = 0;
   AddrSize progress_size = 100;
   if (global_size >= 100) {
     progress_size = global_size;
@@ -1197,7 +1197,7 @@ void clearEEPROM() {
   if (success) {
     AddrSize position = global_offset;
     AddrSize size = global_size;
-    AddrSize counter = 0;
+    int counter = 0;
     AddrSize progress_size = 100;
     if (size >= 100) {
       // If the size is under 100 bytes and I try to render the progress, the chip thinks
