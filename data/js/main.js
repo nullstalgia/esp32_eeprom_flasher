@@ -1,9 +1,10 @@
 var progress_check_interval;
+// Example: var host = "http://192.168.86.40";
 var host = "";
 var timeout = 5000;
 var offset = 0;
 var size = 0;
-
+var clear_value = 255;
 var max_battery_raw = 2400;
 var low_battery_raw = 1900;
 var max_battery = 4.2;
@@ -27,11 +28,14 @@ function load(is_dump) {
     $("#unknown").change(download_unknown);
   }
 
+  
   if (is_dump) {
     refresh("bin");
     $("#bin").change(download_bin);
     $("#size").change(hex_size);
+    $("#clear_value").change(hex_clear_value);
     hex_size();
+    hex_clear_value();
   }
   hex_offset();
 }
@@ -67,7 +71,9 @@ function progress_check() {
     } else if (data.action == 6) {
       action = "Running Miniboot action!";
     } else if (data.action == 7) {
-        action = "Updating with ArduinoOTA!";
+      action = "Updating with ArduinoOTA!";
+    } else if (data.action == 8) {
+      action = "Clearing EEPROM!";
     }
     var result;
     if (data.progress >= 100) {
@@ -135,6 +141,12 @@ function hex_size() {
   size = parseInt($("#size").val());
   $("#hex_size").html(toHex(size));
   console.log(size);
+}
+
+function hex_clear_value() {
+  clear_value = parseInt($("#clear_value").val());
+  $("#hex_clear_value").html(toHex(clear_value));
+  console.log(clear_value);
 }
 
 function toHex(decimal) {
@@ -251,6 +263,50 @@ function dump(destination) {
   } else {
     alert("You have to choose a size greater than Zero (0)!");
   }
+}
+
+function clear_eeprom() {
+    hex_offset();
+    hex_size();
+    hex_clear_value();
+    var i2caddress = $("#i2c option:selected").val();
+    if (size > 0) {
+        if (i2caddress != undefined) {
+            if (confirm("Are you sure you want to clear with the selected values?")) {
+                //console.log(file);
+                console.log(i2caddress);
+                
+                $.ajax({
+                    type: "GET",
+                    url: host + "/clear_eeprom",
+                    timeout: timeout,
+                    cache: false,
+                    data: {
+                        address: i2caddress,
+                        size: size,
+                        offset: offset,
+                        clear_value: clear_value
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        if (textStatus === "timeout") {
+                            alert("Error! Timed out.");
+                        } else {
+                            alert("Error! - " + errorThrown);
+                        }
+                    },
+                    complete: function(jqXHR, textStatus) {
+                        if (textStatus === "success") {
+                            alert("Action sent: Dump to " + destination);
+                        }
+                    }
+                });
+            }
+        } else {
+            alert("You have to choose an I2C address!");
+        }
+    } else {
+        alert("You have to choose a size greater than Zero (0)!");
+    }
 }
 
 function eeprom_action(action) {

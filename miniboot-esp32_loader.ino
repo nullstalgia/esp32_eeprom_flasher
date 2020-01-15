@@ -58,7 +58,8 @@ typedef enum {
   DUMP_EEPROM_SERIAL,
   DUMP_EEPROM_SPIFFS,
   TEMP_MINIBOOT_ACTION,
-  ARDUINOOTA_UPDATING
+  ARDUINOOTA_UPDATING,
+  CLEARING_EEPROM
 } Progress_action;
 Progress_action current_action = READY;
 
@@ -140,6 +141,7 @@ String global_file;
 byte global_address;
 AddrSize global_offset;
 AddrSize global_size;
+byte global_clear_value;
 
 // What byte failed during a verify?
 AddrSize byte_failed;
@@ -613,6 +615,9 @@ void flashEEPROM() {
     Serial.print("Size: ");
     Serial.println(size);
     while (eeprom_to_flash.available()) {
+      if (success == false) {
+        break;
+      }
 #if USE_EEPROM_PAGES == 0
       Serial.print("Writing to pos: ");
       Serial.println(position);
@@ -1181,6 +1186,87 @@ void read_spiffs_miniboot_crc() {
   }
 }
 
+void clearEEPROM() {
+  Serial.println("Starting to clear EEPROM.");
+  Serial.print("I2C Address (d): ");
+  Serial.println(global_address);
+
+  bool success = true;
+  progress = 0;
+
+  if (success) {
+    AddrSize position = global_offset;
+    AddrSize size = global_size;
+    AddrSize counter = 0;
+    AddrSize progress_size = 100;
+    if (size >= 100) {
+      // If the size is under 100 bytes and I try to render the progress, the chip thinks
+      // I'm dividing by 0 (which would be technically correct).
+      // So this is overcome by having a larger size, but just for the progress to use.
+      progress_size = size;
+    }
+    Serial.print("Size: ");
+    Serial.println(size);
+    while (counter < size) {
+      if (success == false) {
+        break;
+      }
+#if USE_EEPROM_PAGES == 0
+      Serial.print("Writing to pos: ");
+      Serial.println(position);
+      byte response = writeByte(global_address, position, global_clear_value);
+      if (response == EEPROM_OK) {
+        progress = counter / (progress_size / 100);
+        updateProgress();
+        // Position and counter are seperate due to global_offset.
+        position++;
+        counter++;
+      } else {
+        progress = 102;
+        Serial.println("Fail due to bad response");
+        Serial.println((int)response);
+        success = false;
+      }
+#else
+      Serial.print("Writing to pos: ");
+      Serial.println(position);
+      uint8_t buffer[EEPROM_PAGE_SIZE];
+      for (int i = 0; i < EEPROM_PAGE_SIZE; i++) {
+        buffer[i] = global_clear_value;
+      }
+      byte response = writePage(global_address, position, &buffer[0], EEPROM_PAGE_SIZE);
+      if (response == EEPROM_OK) {
+        progress = counter / (progress_size / 100);
+        updateProgress();
+        // Position and counter are seperate due to global_offset.
+        position += EEPROM_PAGE_SIZE;
+        counter += EEPROM_PAGE_SIZE;
+      } else {
+        progress = 102;
+        Serial.println("Fail due to bad response");
+        Serial.println((int)response);
+        success = false;
+      }
+#endif
+      if (counter >= size) {
+        break;
+      }
+    }
+
+    current_action = READY;
+    if (success) {
+      progress = 101;
+    } else {
+      progress = 102;
+    }
+
+  } else {
+    progress = 102;
+    Serial.println("Fail???");
+  }
+  Serial.println("EEPROM clear ended.");
+  current_action = READY;
+}
 
 // the setup function runs once when you press reset or power the board
 void setup() {
@@ -1323,6 +1409,11 @@ void setup() {
   server.on("/dump.html", HTTP_ANY, [](AsyncWebServerRequest * request) {
     //request->send(200, "text/html", page);
     request->send(SPIFFS, "/dump.html", String(), false);
+  });
+
+  server.on("/clear.html", HTTP_ANY, [](AsyncWebServerRequest * request) {
+    //request->send(200, "text/html", page);
+    request->send(SPIFFS, "/clear.html", String(), false);
   });
 
   server.on("/js/main.js", HTTP_ANY, [](AsyncWebServerRequest * request) {
@@ -1612,6 +1703,39 @@ void setup() {
 
   });
 
+  // Clearing I2C EEPROM
+  server.on("/clear_eeprom", HTTP_GET, [] (AsyncWebServerRequest * request) {
+    //listDir(SPIFFS, "/", 2);
+    if (current_action != READY) {
+      request->send(503);
+    } else {
+      progress = 0;
+      if (request->hasParam("size") && request->hasParam("address") && request->hasParam("clear_value")) {
+
+        global_address = request->getParam("address")->value().toInt();
+        global_size = request->getParam("size")->value().toInt();
+
+        if (request->hasParam("offset")) {
+          global_offset = request->getParam("offset")->value().toInt();
+        } else {
+          global_offset = 0;
+        }
+
+        int given_clear_value = request->getParam("clear_value")->value().toInt();
+        if (given_clear_value < 0 || given_clear_value > 255) {
+          request->send(503, "text/plain", "Clear value must be 0-255");
+        } else {
+          global_clear_value = (byte)given_clear_value;
+          current_action = CLEARING_EEPROM;
+          request->send(200, "text/plain", "OK");
+        }
+
+      } else {
+        request->send(503, "text/plain", "need 'size,' 'address,' and 'clear_value' params");
+      }
+    }
+  });
+
   server.onNotFound(notFound);
 
   server.onFileUpload(handleUpload);
@@ -1658,5 +1782,7 @@ void loop() {
     dumpEEPROMSerial();
   } else if (current_action == DUMP_EEPROM_SPIFFS) {
     dumpEEPROMSPIFFS();
+  } else if (current_action == CLEARING_EEPROM) {
+    clearEEPROM();
   }
 }
