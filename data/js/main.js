@@ -1,5 +1,6 @@
 var progress_check_interval;
-// Example: var host = "http://192.168.86.40";
+// Example:
+//var host = "http://192.168.86.40";
 var host = "";
 var timeout = 5000;
 var offset = 0;
@@ -117,6 +118,11 @@ function progress_check() {
     $("#result").html(result);
     var text = `Battery Voltage: ${battery}V`;
     $("#progress").val(data.progress);
+    var percent = data.progress;
+    if (percent > 100){
+        percent = 100;
+    }
+    $("#progress_percent").html(percent+"%");    
     //console.log(data);
     if (battery < no_battery) {
       text = "";
@@ -253,7 +259,7 @@ function dump(destination) {
         },
         complete: function(jqXHR, textStatus) {
           if (textStatus === "success") {
-            alert("Action sent: Dump to " + destination);
+            //alert("Action sent: Dump to " + destination);
           }
         }
       });
@@ -296,7 +302,7 @@ function clear_eeprom() {
                     },
                     complete: function(jqXHR, textStatus) {
                         if (textStatus === "success") {
-                            alert("Action sent: Dump to " + destination);
+                            //alert("Action sent: Dump to " + destination);
                         }
                     }
                 });
@@ -338,7 +344,7 @@ function eeprom_action(action) {
         },
         complete: function(jqXHR, textStatus) {
           if (textStatus === "success") {
-            alert("Action sent: " + action);
+            //alert("Action sent: " + action);
           }
         }
       });
@@ -373,7 +379,7 @@ function delete_file(section) {
         },
         complete: function(jqXHR, textStatus) {
           if (textStatus === "success") {
-            alert("Deleted.");
+            //alert("Deleted.");
           }
         }
       });
