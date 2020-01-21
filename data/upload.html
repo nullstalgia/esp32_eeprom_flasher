@@ -7,12 +7,12 @@
         content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
 
         <!-- Bootstrap CSS -->
-        <link crossorigin="anonymous" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" rel="stylesheet">
-
+        <link crossorigin="anonymous" href="https://stackpath.bootstrapcdn.com/bootswatch/4.4.1/darkly/bootstrap.min.css" rel="stylesheet">
+        <link href="css/index.css" rel="stylesheet">
         <title>EEPROM Loader - Upload File</title>
     </head>
     <body onload="load()">
-        <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <a class="navbar-brand" href="index.html">EEPROM Loader</a>
             <button class="navbar-toggler" data-target="#navbarSupportedContent" data-toggle="collapse" type="button">
                 <span class="navbar-toggler-icon"></span>
@@ -71,7 +71,7 @@
 
                         <form action="/" enctype="multipart/form-data" method="post">
                             <div class="custom-file">
-                                <input class="custom-file-input" name="fileToUpload" id="fileToUpload" type="file">
+                                <input class="custom-file-input" id="fileToUpload" name="fileToUpload" type="file">
                                 <label class="custom-file-label" for="fileToUpload">Choose file</label>
                             </div>
                             <div>
