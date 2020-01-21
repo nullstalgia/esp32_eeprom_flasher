@@ -1268,6 +1268,18 @@ void clearEEPROM() {
   current_action = READY;
 }
 
+String processor(const String& var)
+{
+  if (var == "PAGE_SIZE") {
+    if (USE_EEPROM_PAGES) {
+      return (String)EEPROM_PAGE_SIZE;
+    } else {
+      return (String)1;
+    }
+  }
+  return String();
+}
+
 // the setup function runs once when you press reset or power the board
 void setup() {
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
@@ -1353,7 +1365,7 @@ void setup() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
     //request->send(200, "text/html", page);
     if (!did_spiffs_fail) {
-      request->send(SPIFFS, "/index.html", String(), false);
+      request->send(SPIFFS, "/index.html", String(), false, processor);
     } else {
       request->send(200, "text/plain", "SPIFFS Failed to mount. Formatted. Reflash please!");
     }
@@ -1362,7 +1374,7 @@ void setup() {
   server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest * request) {
     //request->send(200, "text/html", page);
     if (!did_spiffs_fail) {
-      request->send(SPIFFS, "/index.html", String(), false);
+      request->send(SPIFFS, "/index.html", String(), false, processor);
     } else {
       request->send(200, "text/plain", "SPIFFS Failed to mount. Formatted. Reflash please!");
     }
@@ -1398,22 +1410,27 @@ void setup() {
 
   server.on("/miniboot.html", HTTP_ANY, [](AsyncWebServerRequest * request) {
     //request->send(200, "text/html", page);
-    request->send(SPIFFS, "/miniboot.html", String(), false);
+    request->send(SPIFFS, "/miniboot.html", String(), false, processor);
   });
 
   server.on("/upload.html", HTTP_ANY, [](AsyncWebServerRequest * request) {
     //request->send(200, "text/html", page);
-    request->send(SPIFFS, "/upload.html", String(), false);
+    request->send(SPIFFS, "/upload.html", String(), false, processor);
+  });
+
+  server.on("/files.html", HTTP_ANY, [](AsyncWebServerRequest * request) {
+    //request->send(200, "text/html", page);
+    request->send(SPIFFS, "/files.html", String(), false, processor);
   });
 
   server.on("/dump.html", HTTP_ANY, [](AsyncWebServerRequest * request) {
     //request->send(200, "text/html", page);
-    request->send(SPIFFS, "/dump.html", String(), false);
+    request->send(SPIFFS, "/dump.html", String(), false, processor);
   });
 
   server.on("/clear.html", HTTP_ANY, [](AsyncWebServerRequest * request) {
     //request->send(200, "text/html", page);
-    request->send(SPIFFS, "/clear.html", String(), false);
+    request->send(SPIFFS, "/clear.html", String(), false, processor);
   });
 
   server.on("/js/main.js", HTTP_ANY, [](AsyncWebServerRequest * request) {

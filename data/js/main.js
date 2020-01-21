@@ -11,7 +11,10 @@ var low_battery_raw = 1900;
 var max_battery = 4.2;
 var low_battery = 3.5;
 var no_battery = 3.3;
-
+var alert_index = 0;
+var battery_value_array = [];
+var battery_index = 0;
+var battery_percent = 0;
 function load(is_dump) {
   progress_check();
   progress_check_interval = setInterval(progress_check, 1000);
@@ -20,42 +23,28 @@ function load(is_dump) {
   refresh("i2c");
   $("#offset").change(hex_offset);
 
-  if (!is_dump) {
-    refresh("eeprom");
-    //
-    refresh("unknown");
-    $("#eeprom").change(download_eeprom);
+  refresh("eeprom");
+  //
+  refresh("unknown");
+  $("#eeprom").change(download_eeprom);
 
-    $("#unknown").change(download_unknown);
-  }
+  $("#unknown").change(download_unknown);
 
-  
-  if (is_dump) {
-    refresh("bin");
-    $("#bin").change(download_bin);
-    $("#size").change(hex_size);
-    $("#clear_value").change(hex_clear_value);
-    hex_size();
-    hex_clear_value();
-  }
+  refresh("bin");
+  $("#bin").change(download_bin);
+  $("#size").change(hex_size);
+  $("#clear_value").change(hex_clear_value);
+  hex_size();
+  hex_clear_value();
+  $("#hex_size").change(hexSizeToDecimal);
+  $("#hex_clear_value").change(hexValueToDecimal);
+
   hex_offset();
+  $("#hex_offset").change(hexOffsetToDecimal);
 }
 
 function progress_check() {
   $.getJSON(host + "/progress", function(data) {
-    // Battery values were measured with a variable voltage power supply and the raw output of data.battery
-    var battery = map(
-      data.battery,
-      low_battery_raw,
-      max_battery_raw,
-      low_battery,
-      max_battery
-    );
-    battery = Math.floor(battery * 100) / 100;
-    var battery_status;
-    if (battery < low_battery + 0.1 && battery > no_battery) {
-      battery_status = "Low Battery!";
-    }
     var action;
     if (data.action == 0) {
       action = "Ready!";
@@ -86,12 +75,12 @@ function progress_check() {
         result = "Verify Success";
       } else if (data.progress == 104) {
         var decimal = data.fail_byte;
-        result = "Verify Fail at D: " + decimal + "  H: " + toHex(decimal);
+        result = "Verify Fail at D: " + decimal + "  H: 0x" + toHex(decimal);
         // This can be expanded to the other ones easily, but I don't see a reason to.
       } else if (data.progress == 105) {
-          result = "Upload to SPIFFS Success";
+        result = "Upload to SPIFFS Success";
       } else if (data.progress == 106) {
-          result = "Upload to SPIFFS Fail";
+        result = "Upload to SPIFFS Fail";
       } else if (data.progress == 107) {
         if (data.dump_name != 0) {
           result = "Dumped successfully to: " + data.dump_name + ".eeprom";
@@ -106,9 +95,10 @@ function progress_check() {
           result = "Dump Fail";
         }
       } else if (data.progress == 109) {
-          result = "ArduinoOTA finished. Refresh if it doesn't automatically reconnect";
+        result =
+          "ArduinoOTA finished. Refresh if it doesn't automatically reconnect";
       } else if (data.progress == 110) {
-          result = "ArduinoOTA failed! Please try again or flash over UART";
+        result = "ArduinoOTA failed! Please try again or flash over UART";
       }
     } else {
       result = "";
@@ -116,19 +106,67 @@ function progress_check() {
 
     $("#action").html(action);
     $("#result").html(result);
-    var text = `Battery Voltage: ${battery}V`;
-    $("#progress").val(data.progress);
+    $("#progress_percent").width(data.progress + "%");
     var percent = data.progress;
-    if (percent > 100){
-        percent = 100;
+
+    $("#progress_percent").removeClass("bg-info bg-danger bg-success");
+    if (percent > 100) {
+      if (percent % 2 == 0) {
+        $("#progress_percent").addClass("bg-danger");
+      } else {
+        $("#progress_percent").addClass("bg-success");
+      }
+      percent = 100;
+    } else {
+      $("#progress_percent").addClass("bg-info");
     }
-    $("#progress_percent").html(percent+"%");    
+    $("#progress_percent").html(percent + "%");
+
+    // Battery values were measured with a variable voltage power supply and the raw output of data.battery
+    var battery = map(
+      data.battery,
+      low_battery_raw,
+      max_battery_raw,
+      low_battery,
+      max_battery
+    );
+
     //console.log(data);
     if (battery < no_battery) {
-      text = "";
+      $(".battery").css("display", "none");
+    } else {
+      //$(".battery").css("display", "flex");
+
+      battery_value_array[battery_index] = battery;
+      battery_index++;
+      if(battery_index >= 25){
+        battery_index = 0;
+      }
+      var battery_average = 0;
+      for (let i = 0; i < battery_value_array.length; i++) {
+        battery_average += battery_value_array[i];
+      }
+      battery = battery_average/battery_value_array.length;
+      battery = Math.floor(battery * 100) / 100;
+      var battery_text = battery + "V";
+      $("#battery").html(battery_text);
+      battery_percent = map(
+        battery,
+        low_battery,
+        max_battery,
+        0,
+        100
+      );
+      $("#battery").width(battery_percent + "%");
+      $("#battery").removeClass("bg-warning bg-danger bg-success");
+      if(battery_percent > (2/3)*100){
+        $("#battery").addClass("bg-success");
+      } else if (battery_percent > (1/3)*100){
+        $("#battery").addClass("bg-warning");
+      } else {
+        $("#battery").addClass("bg-danger");
+      }
     }
-    $("#battery").html(text);
-    $("#battery_status").html(battery_status);
   });
 }
 
@@ -139,26 +177,41 @@ function map(x, in_min, in_max, out_min, out_max) {
 
 function hex_offset() {
   offset = parseInt($("#offset").val());
-  $("#hex_offset").html(toHex(offset));
+  $("#hex_offset").val(toHex(offset));
   console.log(offset);
 }
 
 function hex_size() {
   size = parseInt($("#size").val());
-  $("#hex_size").html(toHex(size));
+  $("#hex_size").val(toHex(size));
   console.log(size);
 }
 
 function hex_clear_value() {
   clear_value = parseInt($("#clear_value").val());
-  $("#hex_clear_value").html(toHex(clear_value));
+  $("#hex_clear_value").val(toHex(clear_value));
   console.log(clear_value);
 }
 
 function toHex(decimal) {
-  var result = "0x";
+  var result = "";
   result = result + decimal.toString(16).toUpperCase();
   return result;
+}
+
+function hexOffsetToDecimal() {
+  var input = $("#hex_offset").val();
+  $("#offset").val(parseInt(input, 16));
+}
+
+function hexSizeToDecimal() {
+  var input = $("#hex_size").val();
+  $("#size").val(parseInt(input, 16));
+}
+
+function hexValueToDecimal() {
+  var input = $("#hex_clear_value").val();
+  $("#clear_value").val(parseInt(input, 16));
 }
 
 function getLength() {
@@ -181,14 +234,14 @@ function getLength() {
             hex_offset();
             hex_size();
           }
-          alert("Length has been set! Dump when ready.");
+          showalert("Length has been set! Dump when ready.", "info");
         } else {
-          alert("Is not a proper miniboot eeprom?");
+          showalert("Is not a proper miniboot eeprom?", "warning");
         }
       }
     );
   } else {
-    alert("You have to choose an I2C address!");
+    showalert("You have to choose an I2C address!");
   }
 }
 
@@ -206,12 +259,12 @@ function getCRC(source) {
             alert(data);
             console.log(data);
           } else {
-            alert("Is not a proper miniboot eeprom?");
+            showalert("Is not a proper miniboot eeprom?", "warning");
           }
         }
       );
     } else {
-      alert("You have to choose an I2C address!");
+      showalert("You have to choose an I2C address!");
     }
   } else if (source == "spiffs") {
     var file = $("#eeprom option:selected").val();
@@ -222,11 +275,11 @@ function getCRC(source) {
           alert(data);
           console.log(data);
         } else {
-          alert("Is not a proper miniboot eeprom?");
+          showalert("Is not a proper miniboot eeprom?", "warning");
         }
       });
     } else {
-      alert("You have to choose an EEPROM file!");
+      showalert("You have to choose an EEPROM file!");
     }
   }
 }
@@ -252,67 +305,67 @@ function dump(destination) {
         },
         error: function(jqXHR, textStatus, errorThrown) {
           if (textStatus === "timeout") {
-            alert("Error! Timed out.");
+            showalert("Error! Timed out.");
           } else {
-            alert("Error! - " + errorThrown);
+            showalert("Error! - " + errorThrown);
           }
         },
         complete: function(jqXHR, textStatus) {
           if (textStatus === "success") {
-            //alert("Action sent: Dump to " + destination);
+            showalert("Action sent: Dump to " + destination, "success");
           }
         }
       });
     } else {
-      alert("You have to choose an I2C address!");
+      showalert("You have to choose an I2C address!");
     }
   } else {
-    alert("You have to choose a size greater than Zero (0)!");
+    showalert("You have to choose a size greater than Zero (0)!");
   }
 }
 
 function clear_eeprom() {
-    hex_offset();
-    hex_size();
-    hex_clear_value();
-    var i2caddress = $("#i2c option:selected").val();
-    if (size > 0) {
-        if (i2caddress != undefined) {
-            if (confirm("Are you sure you want to clear with the selected values?")) {
-                //console.log(file);
-                console.log(i2caddress);
-                
-                $.ajax({
-                    type: "GET",
-                    url: host + "/clear_eeprom",
-                    timeout: timeout,
-                    cache: false,
-                    data: {
-                        address: i2caddress,
-                        size: size,
-                        offset: offset,
-                        clear_value: clear_value
-                    },
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        if (textStatus === "timeout") {
-                            alert("Error! Timed out.");
-                        } else {
-                            alert("Error! - " + errorThrown);
-                        }
-                    },
-                    complete: function(jqXHR, textStatus) {
-                        if (textStatus === "success") {
-                            //alert("Action sent: Dump to " + destination);
-                        }
-                    }
-                });
+  hex_offset();
+  hex_size();
+  hex_clear_value();
+  var i2caddress = $("#i2c option:selected").val();
+  if (size > 0) {
+    if (i2caddress != undefined) {
+      if (confirm("Are you sure you want to clear with the selected values?")) {
+        //console.log(file);
+        console.log(i2caddress);
+
+        $.ajax({
+          type: "GET",
+          url: host + "/clear_eeprom",
+          timeout: timeout,
+          cache: false,
+          data: {
+            address: i2caddress,
+            size: size,
+            offset: offset,
+            clear_value: clear_value
+          },
+          error: function(jqXHR, textStatus, errorThrown) {
+            if (textStatus === "timeout") {
+              showalert("Error! Timed out.");
+            } else {
+              showalert("Error! - " + errorThrown);
             }
-        } else {
-            alert("You have to choose an I2C address!");
-        }
+          },
+          complete: function(jqXHR, textStatus) {
+            if (textStatus === "success") {
+              showalert(`Clear action sent. ${size} bytes`, "success");
+            }
+          }
+        });
+      }
     } else {
-        alert("You have to choose a size greater than Zero (0)!");
+      showalert("You have to choose an I2C address!");
     }
+  } else {
+    showalert("You have to choose a size greater than Zero (0)!");
+  }
 }
 
 function eeprom_action(action) {
@@ -337,22 +390,23 @@ function eeprom_action(action) {
         },
         error: function(jqXHR, textStatus, errorThrown) {
           if (textStatus === "timeout") {
-            alert("Error! Timed out.");
+            showalert("Error! Timed out.");
           } else {
-            alert("Error! - " + errorThrown);
+            showalert("Error! - " + errorThrown);
           }
         },
         complete: function(jqXHR, textStatus) {
           if (textStatus === "success") {
             //alert("Action sent: " + action);
+            showalert("Action sent: " + action, "success");
           }
         }
       });
     } else {
-      alert("You have to choose an I2C address!");
+      showalert("You have to choose an I2C address!");
     }
   } else {
-    alert("You have to choose an EEPROM file!");
+    showalert("You have to choose an EEPROM file!");
   }
 }
 
@@ -372,14 +426,14 @@ function delete_file(section) {
         },
         error: function(jqXHR, textStatus, errorThrown) {
           if (textStatus === "timeout") {
-            alert("Error! Timed out.");
+            showalert("Error! Timed out.");
           } else {
-            alert("Error! - " + errorThrown);
+            showalert("Error! - " + errorThrown);
           }
         },
         complete: function(jqXHR, textStatus) {
           if (textStatus === "success") {
-            //alert("Deleted.");
+            showalert("Deleted.", "success");
           }
         }
       });
@@ -387,25 +441,26 @@ function delete_file(section) {
       refresh(section);
     }
   } else {
-    alert("You have to choose a file!");
+    showalert("You have to choose a file!");
   }
 }
 
-function download_eeprom(section) {
+// Unfortunately, there's no way for me to pass an argument to this.... As far as I know
+function download_eeprom() {
   var file = $("#eeprom option:selected").val();
   if (file != undefined) {
     $("#eeprom_download").attr("href", "/fs" + file);
     console.log(file);
   }
 }
-function download_bin(section) {
+function download_bin() {
   var file = $("#bin option:selected").val();
   if (file != undefined) {
     $("#bin_download").attr("href", "/fs" + file);
     console.log(file);
   }
 }
-function download_unknown(section) {
+function download_unknown() {
   var file = $("#unknown option:selected").val();
   if (file != undefined) {
     $("#unknown_download").attr("href", "/fs" + file);
@@ -423,9 +478,9 @@ function refresh(type) {
       cache: false,
       error: function(jqXHR, textStatus, errorThrown) {
         if (textStatus === "timeout") {
-          alert("Error! Timed out.");
+          showalert("Error! Timed out.");
         } else {
-          alert("Error! - " + errorThrown);
+          showalert("Error! - " + errorThrown);
         }
       },
       complete: function(jqXHR, textStatus) {
@@ -435,7 +490,10 @@ function refresh(type) {
             var i;
             for (i = 0; i < devices.length; i++) {
               var decimal = devices[i];
-              $("#i2c").append(new Option(toHex(decimal), decimal));
+              $("#i2c").append(new Option("0x" + toHex(decimal), decimal));
+              if (i == 0) {
+                $("#i2c option").prop("selected", true);
+              }
               //console.log(hex);
             }
           }
@@ -452,9 +510,9 @@ function refresh(type) {
       cache: false,
       error: function(jqXHR, textStatus, errorThrown) {
         if (textStatus === "timeout") {
-          alert("Error! Timed out.");
+          showalert("Error! Timed out.");
         } else {
-          alert("Error! - " + errorThrown);
+          showalert("Error! - " + errorThrown);
         }
       },
       complete: function(jqXHR, textStatus) {
@@ -465,7 +523,10 @@ function refresh(type) {
             var i;
             for (i = 0; i < files.length; i++) {
               $("#" + type).append(
-                new Option(files[i][0] + " - bytes:" + files[i][1], files[i][0])
+                new Option(
+                  files[i][0].split("/").pop() + " - bytes:" + files[i][1],
+                  files[i][0]
+                )
               );
             }
           }
@@ -474,4 +535,31 @@ function refresh(type) {
     });
     //document.querySelector("#log").innerHTML = e.value + "\n" + document.querySelector("#log").innerHTML;
   }
+}
+/**
+  Bootstrap Alerts -
+  Function Name - showalert()
+  Inputs - message,alerttype
+  Example - showalert("Invalid Login","alert-error")
+  Types of alerts -- "alert-danger","alert-success","alert-info","alert-warning"
+  Required - You only need to add a alert_placeholder div in your html page wherever you want to display these alerts "<div id="alert_placeholder"></div>"
+  Written On - 14-Jun-2013
+**/
+// https://stackoverflow.com/a/17118264/6037497
+function showalert(message, alerttype = "danger") {
+  $("#alert_placeholder").append(
+    '<div id="alertdiv' +
+      alert_index +
+      '" class="alert alert-' +
+      alerttype +
+      ' show fade"><a class="close" data-dismiss="alert">×</a><span>' +
+      message +
+      "</span></div>"
+  );
+  //style="display:none;"
+  //$("#alertdiv").fadeIn();
+  setTimeout(function() {
+    // this will automatically close the alert and remove this if the users doesnt close it in 5 secs
+    $("#alertdiv" + alert_index).alert("close");
+  }, 3000);
 }
