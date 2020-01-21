@@ -9,7 +9,7 @@ Made with [Miniboot for AVRs](https://github.com/mihaigalos/miniboot) in mind
 - [https://github.com/me-no-dev/ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer) 
 - [https://github.com/bblanchon/ArduinoJson](https://github.com/bblanchon/ArduinoJson)
 
-![Screenshot](https://i.imgur.com/d4410nA.png  "Screenshot")
+![Screenshot](https://i.imgur.com/VRAECkA.png  "Screenshot")
 
 ## How to use:
 
