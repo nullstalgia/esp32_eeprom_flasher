@@ -1,57 +1,61 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <!-- Required meta tags -->
-        <meta charset="utf-8">
-        <meta
-        content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
 
-        <!-- Bootstrap CSS -->
-        <link crossorigin="anonymous" href="https://stackpath.bootstrapcdn.com/bootswatch/4.4.1/darkly/bootstrap.min.css" rel="stylesheet">
-        <link href="css/index.css" rel="stylesheet">
-        <title>EEPROM Loader - Upload File</title>
-    </head>
-    <body onload="load()">
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-            <a class="navbar-brand" href="index.html">EEPROM Loader</a>
-            <button class="navbar-toggler" data-target="#navbarSupportedContent" data-toggle="collapse" type="button">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                <ul class="navbar-nav mr-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="index.html">Home</a>
-                    </li>
-                    <li class="nav-item active">
-                        <a class="nav-link" href="upload.html">Upload File</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="dump.html">Dump EEPROM</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="clear.html">Clear EEPROM</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="miniboot.html">Miniboot Tools</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="files.html">Files</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link disabled" href="">Page Size: %PAGE_SIZE%</a>
-                    </li>
-                </ul>
-            </div>
-        </nav>
-        <div id="alert_placeholder" style="position: absolute; z-index: 9999; top: 0em; left: 0; right: 0; margin: auto;"></div>
-        <div class="container-fluid">
-            <div class="row">
-                <div class="col-md-12">
-                    <div class="row">
-                        <div class="col-md-12">
-                            <div class="row">
-                                <div class="col-md-4"></div>
-                                <div class="col-md-4">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
+
+    <!-- Bootstrap CSS -->
+    <link crossorigin="anonymous" href="https://stackpath.bootstrapcdn.com/bootswatch/4.4.1/darkly/bootstrap.min.css"
+        rel="stylesheet">
+    <link href="css/index.css" rel="stylesheet">
+    <title>EEPROM Loader - Upload File</title>
+</head>
+
+<body onload="load()">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <a class="navbar-brand" href="index.html">EEPROM Loader</a>
+        <button class="navbar-toggler" data-target="#navbarSupportedContent" data-toggle="collapse" type="button">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="index.html">Home</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="upload.html">Upload File</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="dump.html">Dump EEPROM</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="clear.html">Clear EEPROM</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="miniboot.html">Miniboot Tools</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="files.html">Files</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link disabled" href="">Page Size: %PAGE_SIZE%</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+    <div id="alert_placeholder" style="position: absolute; z-index: 9999; top: 0em; left: 0; right: 0; margin: auto;">
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="row">
+                            <div class="col-md-4"></div>
+                            <div class="col-md-4">
+                                <div class="p-pad">
                                     <div class="progress" style="height: 2em;">
                                         <div class="progress-bar" id="progress_percent">
                                             ??
@@ -60,51 +64,56 @@
                                     <div id="action" style="text-align: center;">Not Ready!</div>
                                     <div id="result" style="text-align: center;">Connecting...</div>
                                 </div>
-                                <div class="col-md-4"></div>
                             </div>
+                            <div class="col-md-4"></div>
                         </div>
                     </div>
-                    <div class="jumbotron">
-                        <h2>
-                            Upload to ESP32 (SPIFFS)
-                        </h2>
+                </div>
+                <div class="jumbotron">
+                    <h2>
+                        Upload to ESP32 (SPIFFS)
+                    </h2>
+                    <hr />
 
-                        <form action="/" enctype="multipart/form-data" method="post">
-                            <div class="custom-file">
-                                <input class="custom-file-input" id="fileToUpload" name="fileToUpload" type="file">
-                                <label class="custom-file-label" for="fileToUpload">Choose file</label>
-                            </div>
-                            <div>
-                                <button class="btn btn-primary" type="submit">Submit</button>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-12"></div>
-                    </div>
+                    <form action="/" enctype="multipart/form-data" method="post">
+                        <div class="custom-file">
+                            <input class="custom-file-input" id="fileToUpload" name="fileToUpload" type="file">
+                            <label class="custom-file-label" for="fileToUpload">Choose file</label>
+                        </div>
+                        <div>
+                            <button class="btn btn-primary" type="submit">Submit</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="row">
+                    <div class="col-md-12"></div>
                 </div>
             </div>
         </div>
-        <footer class="footer mt-auto py-3">
-            <div class="container">
-                <span class="text-muted">Written by
-                    <a href="https://github.com/nullstalgia/">nullstalgia</a>
-                    in 2020 -
-                    <a href="https://github.com/nullstalgia/esp32_eeprom_flasher">Github Repo</a>
-                </span>
-            </div>
-        </footer>
-        <!-- jQuery first, then Popper.js, then Bootstrap JS, then my own stuff -->
-        <script crossorigin="anonymous" src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-        <script crossorigin="anonymous" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
-        <script crossorigin="anonymous" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
-        <script src="js/main.js"></script>
-        <script>
-            // Add the following code if you want the name of the file appear on select
-            $(".custom-file-input").on("change", function () {
-                var fileName = $(this).val().split("\\").pop();
-                $(this).siblings(".custom-file-label").addClass("selected").html(fileName);
-            });
-        </script>
-    </body>
+    </div>
+    <footer class="footer mt-auto py-3">
+        <div class="container">
+            <span class="text-muted">Written by
+                <a href="https://github.com/nullstalgia/">nullstalgia</a>
+                in 2020 -
+                <a href="https://github.com/nullstalgia/esp32_eeprom_flasher">GitHub Repo</a>
+            </span>
+        </div>
+    </footer>
+    <!-- jQuery first, then Popper.js, then Bootstrap JS, then my own stuff -->
+    <script crossorigin="anonymous" src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script crossorigin="anonymous" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+        src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
+    <script crossorigin="anonymous" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6"
+        src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        // Add the following code if you want the name of the file appear on select
+        $(".custom-file-input").on("change", function () {
+            var fileName = $(this).val().split("\\").pop();
+            $(this).siblings(".custom-file-label").addClass("selected").html(fileName);
+        });
+    </script>
+</body>
+
 </html>

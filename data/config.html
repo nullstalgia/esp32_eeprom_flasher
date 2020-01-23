@@ -10,10 +10,10 @@
     <link crossorigin="anonymous" href="https://stackpath.bootstrapcdn.com/bootswatch/4.4.1/darkly/bootstrap.min.css"
         rel="stylesheet">
     <link href="css/index.css" rel="stylesheet">
-    <title>EEPROM Loader - Dump EEPROM</title>
+    <title>EEPROM Loader - Configure ESP</title>
 </head>
 
-<body onload="load()">
+<body onload="preferences_load()">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <a class="navbar-brand" href="index.html">EEPROM Loader</a>
         <button class="navbar-toggler" data-target="#navbarSupportedContent" data-toggle="collapse" type="button">
@@ -27,7 +27,7 @@
                 <li class="nav-item">
                     <a class="nav-link" href="upload.html">Upload File</a>
                 </li>
-                <li class="nav-item active">
+                <li class="nav-item">
                     <a class="nav-link" href="dump.html">Dump EEPROM</a>
                 </li>
                 <li class="nav-item">
@@ -39,7 +39,7 @@
                 <li class="nav-item">
                     <a class="nav-link" href="files.html">Files</a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item active">
                     <a class="nav-link" href="config.html">Config</a>
                 </li>
                 <li class="nav-item">
@@ -74,53 +74,71 @@
                 </div>
                 <div class="jumbotron">
                     <h2>
-                        Dump EEPROM
+                        Configure ESP32 EEPROM Loader
                     </h2>
+                    <h4>
+                        Change how the ESP32 uploads to the I2C EEPROM
+                    </h4>
                     <hr />
+                    <div class="p-pad">
+                        <div class="btn-toolbar">
+                            <div class="btn-group">
+                                <button class="btn btn-secondary" onclick="get_pref()" type="button">Refresh Preferences</button>
+                            </div>
+                        </div>
+                    </div>
+                    <h3>
+                        Use pages when writing
+                    </h3>
                     <h5>
-                        Offset
+                        Writes to a buffer of a set size
                     </h5>
 
-                    <input class="form-control" id="offset" type="number" value="0" />
-                    <div class="input-group mb-3">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">0x</span>
-                        </div>
-                        <input class="form-control" id="hex_offset" type="text">
+                    <div class="fit-jumbo">
+                        <input class="form-check-input" type="checkbox" value="" id="use_pages">
+                        <label class="form-check-label" for="use_pages">
+                            Enable
+                        </label>
                     </div>
 
+                    <h3>
+                        Page Size
+                    </h3>
                     <h5>
-                        Size to dump
+                        Size in bytes - writes that many bytes to the EEPROM's buffer instead of one transaction per byte.
                     </h5>
-
-                    <input class="form-control" id="size" type="number" value="0" />
+                    <input class="form-control" id="size" type="number" value="999" />
                     <div class="input-group mb-3">
                         <div class="input-group-prepend">
                             <span class="input-group-text">0x</span>
                         </div>
                         <input class="form-control" id="hex_size" type="text">
                     </div>
+                    <h3>
+                        Max I2C Attemps
+                    </h3>
+                    <h5>
+                        How many times to (re)try an interaction with the I2C EEPROM before it gives up.
+                    </h5>
+                    <input class="form-control" id="max_att" type="number" value="999" />
+                    <h3>
+                        I2C "Delay"
+                    </h3>
+                    <h5>
+                        Delay in milliseconds after most I2C interaction (set address, write byte, etc)
+                    </h5>
+                    <input class="form-control" id="delay" type="number" value="999" />
+                    <h3>
+                        requestFrom Delay
+                    </h3>
+                    <h5>
+                        Delay in milliseconds after every byte/page read from I2C EEPROM
+                    </h5>
+                    <input class="form-control" id="req_delay" type="number" value="999" />
                     <div class="p-pad">
                         <div class="btn-toolbar">
-                            <div class="btn-group mr-2">
-                                <button class="btn btn-secondary" onclick="dump('spiffs')" type="button">Dump to
-                                    SPIFFS</button>
-                            </div>
                             <div class="btn-group">
-                                <button class="btn btn-secondary" onclick="dump('serial')" type="button">Dump to
-                                    Serial</button>
-                            </div>
-                        </div>
-                    </div>
-                    <h4>
-                        I2C Addresses
-                    </h4>
-                    <select class="custom-select" id="i2c" required size="5"></select>
-                    <div class="p-pad">
-                        <div class="btn-toolbar">
-                            <div class="btn-group">
-                                <button class="btn btn-secondary" onclick="refresh('i2c')"
-                                    type="button">Refresh</button>
+                                <button class="btn btn-secondary" onclick="set_pref()" type="button">Set Preferences</button>
                             </div>
                         </div>
                     </div>

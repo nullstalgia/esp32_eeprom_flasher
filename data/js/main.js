@@ -1,7 +1,7 @@
 var progress_check_interval;
 // Example:
-//var host = "http://192.168.86.40";
 var host = "";
+//host = "http://192.168.86.40";
 var timeout = 5000;
 var offset = 0;
 var size = 0;
@@ -15,7 +15,7 @@ var alert_index = 0;
 var battery_value_array = [];
 var battery_index = 0;
 var battery_percent = 0;
-function load(is_dump) {
+function load() {
   progress_check();
   progress_check_interval = setInterval(progress_check, 1000);
   //refresh("eeprom");
@@ -43,6 +43,85 @@ function load(is_dump) {
   $("#hex_offset").change(hexOffsetToDecimal);
 }
 
+function preferences_load(){
+  load();
+  get_pref();
+}
+
+function get_pref(){
+  showalert("Getting current preferences", "info");
+  $.getJSON(host + "/get_pref", function(data) {
+    console.log(data);
+    $("#use_pages").prop('checked', data.use_pages);
+    $("#size").val(data.page_size);
+    hex_size();
+    $("#max_att").val(data.max_att);
+    $("#delay").val(data.delay);
+    $("#req_delay").val(data.req_delay);
+
+    showalert("Loaded!", "success")
+  });
+}
+
+function set_pref() {
+  hex_size();
+  var use_pages = $('#use_pages').is(':checked');
+  if(use_pages){
+    use_pages = 1;
+  } else {
+    use_pages = 0;
+  }
+  var page_size = size;
+  var max_att = $("#max_att").val();
+  var delay = $("#delay").val();
+  var req_delay = $("#req_delay").val();
+  if (page_size > -1) {
+    if(max_att < 1){
+      showalert("Having a Max Attempt < 1 won't do anything! Allowing anyway.", "warning");
+    }
+    if(delay < 0){
+      showalert("Delay can't be negative!");
+      return;
+    }
+    if(req_delay < 0){
+      showalert("RequestFrom Delay can't be negative!");
+      return;
+    }
+    if (use_pages != undefined) {
+      //console.log(file);
+      $.ajax({
+        type: "GET",
+        url: host + "/set_pref",
+        timeout: timeout,
+        cache: false,
+        data: {
+          use_pages: use_pages,
+          page_size: page_size,
+          max_att: max_att,
+          delay: delay,
+          req_delay: req_delay
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+          if (textStatus === "timeout") {
+            showalert("Error! Timed out.");
+          } else {
+            showalert("Error! - " + errorThrown);
+          }
+        },
+        complete: function(jqXHR, textStatus) {
+          if (textStatus === "success") {
+            showalert("", "success");
+          }
+        }
+      });
+    } else {
+      showalert("Error with the checkbox!");
+    }
+  } else {
+    showalert("You have to choose a size greater than -1!");
+  }
+}
+
 function progress_check() {
   $.getJSON(host + "/progress", function(data) {
     var action;
@@ -64,6 +143,8 @@ function progress_check() {
       action = "Updating with ArduinoOTA!";
     } else if (data.action == 8) {
       action = "Clearing EEPROM!";
+    } else if (data.action == 9) {
+      action = "Updating preferences!";
     }
     var result;
     if (data.progress >= 100) {
@@ -139,29 +220,23 @@ function progress_check() {
 
       battery_value_array[battery_index] = battery;
       battery_index++;
-      if(battery_index >= 25){
+      if (battery_index >= 25) {
         battery_index = 0;
       }
       var battery_average = 0;
       for (let i = 0; i < battery_value_array.length; i++) {
         battery_average += battery_value_array[i];
       }
-      battery = battery_average/battery_value_array.length;
+      battery = battery_average / battery_value_array.length;
       battery = Math.floor(battery * 100) / 100;
       var battery_text = battery + "V";
       $("#battery").html(battery_text);
-      battery_percent = map(
-        battery,
-        low_battery,
-        max_battery,
-        0,
-        100
-      );
+      battery_percent = map(battery, low_battery, max_battery, 0, 100);
       $("#battery").width(battery_percent + "%");
       $("#battery").removeClass("bg-warning bg-danger bg-success");
-      if(battery_percent > (2/3)*100){
+      if (battery_percent > (2 / 3) * 100) {
         $("#battery").addClass("bg-success");
-      } else if (battery_percent > (1/3)*100){
+      } else if (battery_percent > (1 / 3) * 100) {
         $("#battery").addClass("bg-warning");
       } else {
         $("#battery").addClass("bg-danger");

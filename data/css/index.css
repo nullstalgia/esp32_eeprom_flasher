@@ -1,0 +1,19 @@
+.custom-select {
+    background-color: #181a1b;
+    color: white;
+}
+.form-control {
+    background-color: #181a1b;
+    color: white;
+}
+.custom-file-label {
+    background-color: #181a1b;
+    color: white;
+}
+.p-pad {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+}
+.fit-jumbo{
+    margin: 1.25rem;
+}
