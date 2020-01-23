@@ -110,7 +110,7 @@ function set_pref() {
         },
         complete: function(jqXHR, textStatus) {
           if (textStatus === "success") {
-            showalert("", "success");
+            showalert("Saved new preferences!", "success");
           }
         }
       });
