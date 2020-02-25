@@ -121,6 +121,8 @@ AsyncWebServer server(80);
 // How many I2C devices do you want to be allowed to scan/display?
 #define MAX_I2C_COUNT 5
 
+#define STATIC_I2C_ADDRESS 0
+
 // Capacity for MAX_I2C_COUNT I2C addresses.
 const size_t I2C_CAPACITY = JSON_ARRAY_SIZE(MAX_I2C_COUNT);
 // allocate the memory for the document
@@ -160,9 +162,13 @@ unsigned long millis_file_name;
 
 // Used when getting the length from a miniboot header in an external EEPROM
 uint16_t miniboot_extracted_length;
+
 // Used for the JSON buffer when getting the CRC from a miniboot header in an
 // external EEPROM/SPIFFS file
 char crc_to_output[9];
+// Used for the JSON buffer when getting the AppName from a miniboot header in
+// an external EEPROM/SPIFFS file
+char appname_to_output[11];
 
 uint8_t eeprom_max_attempts;
 uint8_t eeprom_delay_between_actions;
@@ -170,6 +176,7 @@ uint8_t eeprom_request_from_delay;
 
 #define MINIBOOT_LENGTH_OFFSET 32
 #define MINIBOOT_CRC_OFFSET 28
+#define MINIBOOT_APPNAME_OFFSET 10
 
 // EEPROM Pages. These will up your speed like crazy, even with a small 32-byte
 // buffer/page.
@@ -179,7 +186,12 @@ uint8_t eeprom_request_from_delay;
 
 // Issue has been found with using Pages. If you don't write at an offset that
 // is divisible by the page, errors will pop up An offset of 0 works fine,
-// however. Example 1: Page Size: 32 Offset: 31 Will error out
+// however.
+
+// Example 1:
+// Page Size: 32
+// Offset: 31
+// Will error out.
 
 // Example 2:
 // Page size: 32
@@ -262,8 +274,10 @@ void updateProgress() {
 
 void updateMinibootJSONBuffer(bool success) {
   sprintf(miniboot_json_buffer,
-          "{\"success\": %s, \"length\": %d, \"written_crc\": \"%s\"}",
-          success ? "true" : "false", miniboot_extracted_length, crc_to_output);
+          "{\"success\": %s, \"length\": %d, \"written_crc\": \"%s\", "
+          "\"appname\": \"%s\"}",
+          success ? "true" : "false", miniboot_extracted_length, crc_to_output,
+          appname_to_output);
 }
 
 bool deleteFile(fs::FS &fs, String path) {
@@ -938,38 +952,45 @@ void scan_i2c() {
   // Decided to just reinit the whole array. This is a cleaner way, anyway.
   I2C_Array = i2cdoc.to<JsonArray>();
   nDevices = 0;
-  for (address = 1; address < 127; address++) {
-    // The I2C_scanner uses the return value of
-    // the Write.endTransmisstion to see if
-    // a device did acknowledge to the address.
-    Wire.beginTransmission(address);
-    error = Wire.endTransmission();
+  if (STATIC_I2C_ADDRESS == 0) {
+    for (address = 1; address < 127; address++) {
+      // The I2C_scanner uses the return value of
+      // the Write.endTransmisstion to see if
+      // a device did acknowledge to the address.
+      Wire.beginTransmission(address);
+      error = Wire.endTransmission();
 
-    if (error == EEPROM_OK) {
-      Serial.print("I2C device found at address 0x");
-      if (address < 16) {
-        Serial.print("0");
+      if (error == EEPROM_OK) {
+        Serial.print("I2C device found at address 0x");
+        if (address < 16) {
+          Serial.print("0");
+        }
+        Serial.print(address, HEX);
+        Serial.println("  !");
+        I2C_Array.add(address);
+        nDevices++;
+        if (nDevices >= MAX_I2C_COUNT) {
+          Serial.println("Max I2C devices found.");
+          break;
+        }
+      } else if (error == EEPROM_OTHER_ERROR) {
+        Serial.print("Unknown error at address 0x");
+        if (address < 16) {
+          Serial.print("0");
+        }
+        Serial.println(address, HEX);
       }
-      Serial.print(address, HEX);
-      Serial.println("  !");
-      I2C_Array.add(address);
-      nDevices++;
-      if (nDevices >= MAX_I2C_COUNT) {
-        Serial.println("Max I2C devices found.");
-        break;
-      }
-    } else if (error == EEPROM_OTHER_ERROR) {
-      Serial.print("Unknown error at address 0x");
-      if (address < 16) {
-        Serial.print("0");
-      }
-      Serial.println(address, HEX);
     }
-  }
-  if (nDevices == 0) {
-    Serial.println("No I2C devices found\n");
+    if (nDevices == 0) {
+      Serial.println("No I2C devices found\n");
+    } else {
+      Serial.println("done\n");
+    }
   } else {
-    Serial.println("done\n");
+    I2C_Array.add(0x50);
+    I2C_Array.add(0x51);
+    I2C_Array.add(0x52);
+    I2C_Array.add(0x53);
   }
 }
 
@@ -1052,26 +1073,47 @@ uint16_t get_miniboot_length() {
   return two_bytes_to_decimal(extracted[0], extracted[1]);
 }
 
-void get_miniboot_crc() {
+void clear_crc_appname_outputs() {
+  for (int i = 0; i < sizeof(crc_to_output); i++) {
+    crc_to_output[i] = (char)0;
+  }
+  for (int i = 0; i < sizeof(appname_to_output); i++) {
+    appname_to_output[i] = (char)0;
+  }
+}
+
+void get_miniboot_crc_appname() {
   AddrSize position = global_offset;
   position += MINIBOOT_CRC_OFFSET;
-  byte extracted[4];
+  byte extracted_crc[4];
   for (int i = 0; i < 4; i++) {
     readByteResponse i2c_response;
     i2c_response = readByte(global_address, position);
     if (i2c_response.success) {
-      extracted[i] = i2c_response.data;
+      extracted_crc[i] = i2c_response.data;
     } else {
-      for (int i = 0; i < sizeof(crc_to_output); i++) {
-        crc_to_output[i] = (char)0;
-      }
+      clear_crc_appname_outputs();
       return;
     }
     position++;
   }
+  sprintf(crc_to_output, "%X%X%X%X", extracted_crc[0], extracted_crc[1],
+          extracted_crc[2], extracted_crc[3]);
 
-  sprintf(crc_to_output, "%X%X%X%X", extracted[0], extracted[1], extracted[2],
-          extracted[3]);
+  position = global_offset;
+  position += MINIBOOT_APPNAME_OFFSET;
+  // char extracted_appname[11];
+  for (int i = 0; i < 10; i++) {
+    readByteResponse i2c_response;
+    i2c_response = readByte(global_address, position);
+    if (i2c_response.success) {
+      appname_to_output[i] = i2c_response.data;
+    } else {
+      clear_crc_appname_outputs();
+      return;
+    }
+    position++;
+  }
 }
 
 bool is_spiffs_eeprom_miniboot() {
@@ -1150,9 +1192,7 @@ void read_spiffs_miniboot_crc() {
   }
 
   if (success) {
-    AddrSize position_of_wanted_data =
-        MINIBOOT_CRC_OFFSET; // Skipping 2 garbage bits before expected
-                             // 'miniboot' constant
+    AddrSize position_of_wanted_data = MINIBOOT_CRC_OFFSET;
     int size_of_wanted_data = 4;
     int extracted_position = 0;
     AddrSize counter = 0;
@@ -1183,6 +1223,58 @@ void read_spiffs_miniboot_crc() {
     sprintf(crc_to_output, "%X%X%X%X", extracted[0], extracted[1], extracted[2],
             extracted[3]);
   } else {
+    clear_crc_appname_outputs();
+    Serial.println("Fail due to bad file");
+  }
+}
+
+void read_spiffs_miniboot_appname() {
+
+  Serial.println("Getting the AppName of a SPIFFS Miniboot file.");
+  Serial.print("File: ");
+  Serial.println(global_file);
+
+  bool success = true;
+
+  File file = SPIFFS.open(global_file);
+  if (!file || file.isDirectory()) {
+    Serial.println("- failed to open file for reading");
+    success = false;
+    file.close();
+  }
+
+  if (success) {
+    AddrSize position_of_wanted_data = MINIBOOT_APPNAME_OFFSET;
+    int size_of_wanted_data = 10;
+    int extracted_position = 0;
+    AddrSize counter = 0;
+    while (file.available() && extracted_position < size_of_wanted_data) {
+      if (counter < position_of_wanted_data) {
+        Serial.print("Skipping pos: ");
+        Serial.println(counter);
+        file.read();
+      } else {
+        Serial.print("Getting from pos: ");
+        Serial.println(counter);
+        byte readbyte = file.read();
+        appname_to_output[extracted_position] = readbyte;
+        extracted_position++;
+      }
+      counter++;
+    }
+    file.close();
+
+    if (extracted_position < size_of_wanted_data) {
+      success = false;
+    }
+  } else {
+    Serial.println("Fail due to bad file");
+  }
+
+  if (success) {
+
+  } else {
+    clear_crc_appname_outputs();
     Serial.println("Fail due to bad file");
   }
 }
@@ -1725,9 +1817,7 @@ void setup() {
               Serial.println("Is a proper miniboot");
               // miniboot_json_buffer
               miniboot_extracted_length = get_miniboot_length();
-              for (int i = 0; i < sizeof(crc_to_output); i++) {
-                crc_to_output[i] = (char)0;
-              }
+              clear_crc_appname_outputs();
               updateMinibootJSONBuffer(true);
               request->send(200, "application/json", miniboot_json_buffer);
             } else {
@@ -1765,7 +1855,8 @@ void setup() {
           Serial.println("Is a proper miniboot");
           miniboot_extracted_length = 0;
           // get crc here
-          get_miniboot_crc();
+          clear_crc_appname_outputs();
+          get_miniboot_crc_appname();
           updateMinibootJSONBuffer(true);
           request->send(200, "application/json", miniboot_json_buffer);
         } else {
@@ -1797,7 +1888,9 @@ void setup() {
             if (is_spiffs_eeprom_miniboot()) {
               Serial.println("Is a proper miniboot");
               // get crc here
+              clear_crc_appname_outputs();
               read_spiffs_miniboot_crc();
+              read_spiffs_miniboot_appname();
               updateMinibootJSONBuffer(true);
               request->send(200, "application/json", miniboot_json_buffer);
             } else {
@@ -1879,6 +1972,7 @@ void setup() {
 
   // if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
+  Serial.println(WiFi.localIP());
   ticker.detach();
   // keep LED on
   digitalWrite(LED, HIGH);

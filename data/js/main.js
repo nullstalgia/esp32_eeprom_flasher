@@ -329,10 +329,10 @@ function getCRC(source) {
         host + "/get_minicrc?address=" + i2caddress + "&offset=" + offset,
         function(data) {
           if (data.success) {
-            var data =
-              "(EEPROM) CRC32 from Miniboot Header: " + data.written_crc;
-            alert(data);
-            console.log(data);
+            var output = "(EEPROM) From Miniboot Header:\nCRC32: " + data.written_crc;
+          output = output+"\nAppName: "+ data.appname;
+          alert(output);
+          console.log(output);
           } else {
             showalert("Is not a proper miniboot eeprom?", "warning");
           }
@@ -346,9 +346,10 @@ function getCRC(source) {
     if (file != undefined) {
       $.getJSON(host + "/get_spiffs_minicrc?file=" + file, function(data) {
         if (data.success) {
-          var data = "(SPIFFS) CRC32 from Miniboot Header: " + data.written_crc;
-          alert(data);
-          console.log(data);
+          var output = "(SPIFFS) From Miniboot Header:\nCRC32: " + data.written_crc;
+          output = output+"\nAppName: "+ data.appname;
+          alert(output);
+          console.log(output);
         } else {
           showalert("Is not a proper miniboot eeprom?", "warning");
         }
