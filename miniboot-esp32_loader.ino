@@ -34,6 +34,9 @@ Ticker ticker;
 #include <Preferences.h>
 Preferences preferences;
 
+// For making it easier to access without knowing the IP Address
+#include <ESPmDNS.h>
+
 // This was part of a failed experiment to increase the address space
 // Mainly since I thought 256K meant 256kilo*bytes* and not *bits*
 // But, I'm keeping it since it looks nice.
@@ -256,6 +259,10 @@ void EEPROM_REQUEST_DELAY() {
   Reading and verifying against source file: ~4.58 seconds
 
 */
+
+// Whether or not the ESP32 should use it's on board LED to slowly blink out
+// it's IP if you don't have access to a Serial port.
+bool blink_ip;
 
 void updateProgress() {
   /*
@@ -1378,7 +1385,17 @@ void printPreferences() {
   Serial.printf("Max Attempts: %d\n", eeprom_max_attempts);
   Serial.printf("Delay: %d\n", eeprom_delay_between_actions);
   Serial.printf("ReqFrom Delay: %d\n", eeprom_request_from_delay);
+  Serial.printf("Blink IP: %s\n", blink_ip ? "true" : "false");
   Serial.println("------");
+}
+
+void blinkNum(int num) {
+  for (int i = 0; i < num; i++) {
+    digitalWrite(LED, HIGH);
+    delay(230);
+    digitalWrite(LED, LOW);
+    delay(230);
+  }
 }
 
 // the setup function runs once when you press reset or power the board
@@ -1425,16 +1442,19 @@ void setup() {
   eeprom_max_attempts = preferences.getInt("max_att", 1);
   eeprom_delay_between_actions = preferences.getInt("delay", 5);
   eeprom_request_from_delay = preferences.getInt("req_delay", 5);
+  blink_ip = preferences.getBool("blink_ip", true);
   // Close session.
   // Not sure why, but I feel like this might avoid issues if I keep it closed
   // when not in use.
   preferences.end();
 
+  Serial.begin(115200);
+
   Serial.println("Loaded preferences: ");
   printPreferences();
 
   // Hostname defaults to esp3232-[MAC]
-  ArduinoOTA.setHostname("MiniBoot-ESP32");
+  ArduinoOTA.setHostname("eeprom32");
 
   ArduinoOTA
       .onStart([]() {
@@ -1580,12 +1600,13 @@ void setup() {
     if (current_action != READY) {
       request->send(503);
     } else {
-      char buffer[150];
+      char buffer[160];
       sprintf(buffer,
               "{\"use_pages\":%d, \"page_size\": %d, \"max_att\": %d, "
-              "\"delay\": %d, \"req_delay\": %d}",
+              "\"delay\": %d, \"req_delay\": %d, \"blink_ip\": %d}",
               use_eeprom_pages, eeprom_page_size, eeprom_max_attempts,
-              eeprom_delay_between_actions, eeprom_request_from_delay);
+              eeprom_delay_between_actions, eeprom_request_from_delay,
+              blink_ip);
       request->send(200, "application/json", buffer);
       Serial.println("Requested preferences: ");
       printPreferences();
@@ -1599,7 +1620,7 @@ void setup() {
     } else {
       if (request->hasParam("use_pages") && request->hasParam("page_size") &&
           request->hasParam("max_att") && request->hasParam("delay") &&
-          request->hasParam("req_delay")) {
+          request->hasParam("req_delay") && request->hasParam("blink_ip")) {
         current_action = UPDATING_PREFERENCES;
         progress = 0;
         use_eeprom_pages = request->getParam("use_pages")->value().toInt();
@@ -1609,6 +1630,7 @@ void setup() {
             request->getParam("delay")->value().toInt();
         eeprom_request_from_delay =
             request->getParam("req_delay")->value().toInt();
+        blink_ip = request->getParam("blink_ip")->value().toInt();
 
         preferences.begin("i2c_eeprom", false);
 
@@ -1617,6 +1639,7 @@ void setup() {
         preferences.putInt("max_att", eeprom_max_attempts);
         preferences.putInt("delay", eeprom_delay_between_actions);
         preferences.putInt("req_delay", eeprom_request_from_delay);
+        preferences.putBool("blink_ip", blink_ip);
 
         preferences.end();
 
@@ -1965,15 +1988,53 @@ void setup() {
     }
   });
 
+  // Set hostname for mDNS
+  if (!MDNS.begin("eeprom32")) {
+    Serial.println("Error setting up MDNS responder!");
+  } else {
+    Serial.println("MDNS has started.");
+  }
+
   server.begin();
 
   Wire.setClock(400000);
   Wire.begin(25, 26);
 
   // if you get here you have connected to the WiFi
-  Serial.println("connected...yeey :)");
+  Serial.println("Ready to go! IP:");
   Serial.println(WiFi.localIP());
   ticker.detach();
+  if (blink_ip) {
+    digitalWrite(LED, LOW);
+    delay(2000);
+    for (int i = 0; i < 4; i++) {
+      int current_num = WiFi.localIP()[i];
+      int num0 = -1;
+      int num1 = 0;
+      int num2 = 0;
+      if (current_num >= 100) {
+        num0 = current_num / 100;
+        num1 = (current_num / 10) % 10;
+      } else {
+        num1 = current_num / 10;
+      }
+
+      num2 = current_num % 10;
+      if (num0 != -1) {
+        blinkNum(num0);
+        delay(500);
+      }
+      blinkNum(num1);
+      delay(500);
+      blinkNum(num2);
+      delay(500);
+      delay(1000);
+    }
+  }
+
+  // Set the service and port.
+  MDNS.addService("http", "tcp", 80);
+
   // keep LED on
   digitalWrite(LED, HIGH);
 }

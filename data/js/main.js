@@ -53,6 +53,7 @@ function get_pref(){
   $.getJSON(host + "/get_pref", function(data) {
     console.log(data);
     $("#use_pages").prop('checked', data.use_pages);
+    $("#blink_ip").prop('checked', data.blink_ip);
     $("#size").val(data.page_size);
     hex_size();
     $("#max_att").val(data.max_att);
@@ -70,6 +71,12 @@ function set_pref() {
     use_pages = 1;
   } else {
     use_pages = 0;
+  }
+  var blink_ip = $('#blink_ip').is(':checked');
+  if(blink_ip){
+    blink_ip = 1;
+  } else {
+    blink_ip = 0;
   }
   var page_size = size;
   var max_att = $("#max_att").val();
@@ -99,7 +106,8 @@ function set_pref() {
           page_size: page_size,
           max_att: max_att,
           delay: delay,
-          req_delay: req_delay
+          req_delay: req_delay,
+          blink_ip: blink_ip
         },
         error: function(jqXHR, textStatus, errorThrown) {
           if (textStatus === "timeout") {
